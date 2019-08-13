@@ -390,6 +390,9 @@ HRESULT DoRewriteUnused(_In_ DxcLangExtensionsHelper *pHelper,
   SmallPtrSet<VarDecl*, 128> unusedGlobals;
   DenseMap<RecordDecl*, unsigned> anonymousRecordRefCounts;
   SmallPtrSet<FunctionDecl*, 128> unusedFunctions;
+  /* UE-Change-Begin: Track structure initalisation and don't elide any list initialisers */
+  SmallVector<VarDecl*, 32> pendingStructInit;
+  /* UE-Change-End: Track structure initalisation and don't elide any list initialisers */
   for (Decl *tuDecl : tu->decls()) {
     if (tuDecl->isImplicit()) continue;
 
@@ -406,6 +409,11 @@ HRESULT DoRewriteUnused(_In_ DxcLangExtensionsHelper *pHelper,
       }
       continue;
     }
+    /* UE-Change-Begin: Track structure initalisation and don't elide any list initialisers */
+	else if (varDecl != nullptr && varDecl->getType().getTypePtr()->isStructureType()) {
+      pendingStructInit.push_back(varDecl);
+	}
+    /* UE-Change-End: Track structure initalisation and don't elide any list initialisers */
 
     FunctionDecl* fnDecl = dyn_cast_or_null<FunctionDecl>(tuDecl);
     if (fnDecl != nullptr) {
@@ -440,6 +448,12 @@ HRESULT DoRewriteUnused(_In_ DxcLangExtensionsHelper *pHelper,
         visitedFunctions.insert(pendingDecl);
         visitor.TraverseDecl(pendingDecl);
       }
+      /* UE-Change-Begin: Track structure initalisation and don't elide any list initialisers */
+      while (!pendingStructInit.empty() && !unusedGlobals.empty()) {
+        VarDecl* pendingDecl = pendingStructInit.pop_back_val();
+        visitor.TraverseDecl(pendingDecl);
+      }
+      /* UE-Change-End: Track structure initalisation and don't elide any list initialisers */
 
       // Don't bother doing work if there are no globals to remove.
       if (unusedGlobals.empty()) {
