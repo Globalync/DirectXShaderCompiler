@@ -722,11 +722,15 @@ SpirvVariable *DeclResultIdMapper::createStructOrStructArrayVarOfExplicitLayout(
     // We don't need it here.
     auto varType = declDecl->getType();
     varType.removeLocalConst();
+	// UE Begin Change: Threadgroup memory should not be put into the globals table
+	if (!forGlobals || !declDecl->getAttr<HLSLGroupSharedAttr>()) {
     HybridStructType::FieldInfo info(varType, declDecl->getName(),
                                      declDecl->getAttr<VKOffsetAttr>(),
                                      getPackOffset(declDecl), registerC,
                                      declDecl->hasAttr<HLSLPreciseAttr>());
     fields.push_back(info);
+  }
+	// UE End Change: Threadgroup memory should not be put into the globals table
   }
 
   // Get the type for the whole struct
@@ -935,8 +939,12 @@ void DeclResultIdMapper::createGlobalsCBuffer(const VarDecl *var) {
         return;
       }
 
+	  // UE Begin Change: Threadgroup memory should not be put into the globals table
+	  if (!varDecl->getAttr<HLSLGroupSharedAttr>()) {
       astDecls[varDecl] = DeclSpirvInfo(globals, index++);
     }
+	  // UE End Change: Threadgroup memory should not be put into the globals table
+	}
 }
 
 SpirvFunction *DeclResultIdMapper::getOrRegisterFn(const FunctionDecl *fn) {
